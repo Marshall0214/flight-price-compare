@@ -13,6 +13,16 @@ CITY_TO_AIRPORTS: dict[str, list[str]] = {
     "新加坡": ["SIN"],
     "北京": ["PEK", "PKX"],
     "曼谷": ["BKK"],
+    # 下面这几个城市目前没有对应的 mock 航班数据，但机场代码本身是真实、可解析的——
+    # 用来区分"城市/机场代码合法，只是暂时没有航班数据"（NO_RESULTS）和
+    # "根本认不出这是哪个城市/机场"（UNKNOWN_LOCATION）两种不同的失败原因。
+    # 代码来自公开的 IATA 机场代码数据（如 github.com/mwgg/Airports），不是瞎编的。
+    "广州": ["CAN"],
+    "深圳": ["SZX"],
+    "香港": ["HKG"],
+    "首尔": ["ICN", "GMP"],
+    "纽约": ["JFK", "LGA", "EWR"],
+    "伦敦": ["LHR", "LGW"],
 }
 
 KNOWN_AIRPORT_CODES: set[str] = {code for codes in CITY_TO_AIRPORTS.values() for code in codes}

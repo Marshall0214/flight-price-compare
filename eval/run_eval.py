@@ -71,11 +71,13 @@ def run_scenario(scenario: dict) -> dict:
         actual = (result.get("request") or {}).get(field)
         fields_ok = fields_ok and field_matches(expected, actual)
 
-    # expected_results 校验的是真正的业务结果（比如哪趟航班赢得了 cheapest），
-    # 不只是状态码——这是让评测集不止"跑通"而是"结果对"的关键。
+    # expected_results 校验的是真正的业务结果（比如哪趟航班赢得了 cheapest，
+    # 或者失败原因具体是哪种 error_code），不只是状态码——这是让评测集不止
+    # "跑通"而是"结果对"的关键。路径从完整的 result 出发，比如
+    # "results.cheapest.outbound.flight_id" 或 "error.error_code"。
     results_ok = True
     for dotted_path, expected in scenario.get("expected_results", {}).items():
-        actual = _get_path(result.get("results"), dotted_path)
+        actual = _get_path(result, dotted_path)
         results_ok = results_ok and field_matches(expected, actual)
 
     return {

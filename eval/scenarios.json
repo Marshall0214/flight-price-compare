@@ -11,7 +11,7 @@
     "turns": ["帮我查2026年9月10日从上海到东京，9月15日回上海的往返机票"],
     "expected_status": "results",
     "expected_results": {
-      "cheapest.return.flight_id": "NH921"
+      "results.cheapest.return.flight_id": "NH921"
     }
   },
   {
@@ -40,15 +40,21 @@
   },
   {
     "id": 7,
-    "name": "错误机场代码",
+    "name": "错误机场代码（根本无法识别的城市/代码）",
     "turns": ["帮我查一下2026年9月10日从ABC到东京的机票"],
-    "expected_status": "error"
+    "expected_status": "error",
+    "expected_results": {
+      "error.error_code": "UNKNOWN_LOCATION"
+    }
   },
   {
     "id": 8,
-    "name": "无符合条件结果（新加坡完全没有航班数据）",
+    "name": "无符合条件结果（新加坡：城市合法但完全没有航班数据）",
     "turns": ["帮我查一下2026年9月10日从上海到新加坡的机票"],
-    "expected_status": "error"
+    "expected_status": "error",
+    "expected_results": {
+      "error.error_code": "NO_RESULTS"
+    }
   },
   {
     "id": 9,
@@ -60,7 +66,7 @@
     "expected_status": "results",
     "expected_fields": {"destination": "北京"},
     "expected_results": {
-      "cheapest.outbound.flight_id": "CA1831"
+      "results.cheapest.outbound.flight_id": "CA1831"
     }
   },
   {
@@ -69,7 +75,7 @@
     "turns": ["2026年9月12日从上海去东京，带20公斤行李，绝对不要红眼航班"],
     "expected_status": "results",
     "expected_results": {
-      "cheapest.outbound.flight_id": "MU5044"
+      "results.cheapest.outbound.flight_id": "MU5044"
     }
   },
   {
@@ -78,7 +84,7 @@
     "turns": ["2026年9月10日从PVG到HND的机票"],
     "expected_status": "results",
     "expected_results": {
-      "cheapest.outbound.flight_id": "NH920"
+      "results.cheapest.outbound.flight_id": "NH920"
     }
   },
   {
@@ -101,7 +107,7 @@
     "expected_status": "results",
     "expected_fields": {"avoid_red_eye": false},
     "expected_results": {
-      "cheapest.outbound.flight_id": "MU5046"
+      "results.cheapest.outbound.flight_id": "MU5046"
     }
   },
   {
@@ -122,7 +128,7 @@
     "turns": ["2026年9月11日从上海到曼谷的机票"],
     "expected_status": "results",
     "expected_results": {
-      "cheapest.outbound.flight_id": "FD588"
+      "results.cheapest.outbound.flight_id": "FD588"
     }
   },
   {
@@ -131,7 +137,7 @@
     "turns": ["2026年9月11日从上海到曼谷，9月16日回上海的往返机票"],
     "expected_status": "results",
     "expected_results": {
-      "cheapest.return.flight_id": "FD589"
+      "results.cheapest.return.flight_id": "FD589"
     }
   },
   {
@@ -148,5 +154,30 @@
       "从上海出发，2026年9月10日"
     ],
     "expected_status": "results"
+  },
+  {
+    "id": 21,
+    "name": "机场代码合法但没有航班数据（区分于场景7的“根本不认识”）",
+    "turns": ["2026年9月10日从广州到东京的机票"],
+    "expected_status": "error",
+    "expected_results": {
+      "error.error_code": "NO_RESULTS"
+    }
+  },
+  {
+    "id": 22,
+    "name": "询问式措辞（参考 ATIS 数据集里 how much is the cheapest flight 这类问法）",
+    "turns": ["从上海到东京最便宜的机票大概多少钱，就9月10号左右"],
+    "expected_status": "results",
+    "expected_fields": {"departure_date": "2026-09-10"}
+  },
+  {
+    "id": 23,
+    "name": "预订式措辞、反向路线（参考 ATIS 里 I'd like to fly from X to Y 这类问法）",
+    "turns": ["我想订一张2026年9月15日从北京飞上海的机票"],
+    "expected_status": "results",
+    "expected_results": {
+      "results.cheapest.outbound.flight_id": "CA1832"
+    }
   }
 ]
