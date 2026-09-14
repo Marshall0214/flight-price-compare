@@ -179,5 +179,70 @@
     "expected_results": {
       "results.cheapest.outbound.flight_id": "CA1832"
     }
+  },
+  {
+    "id": 24,
+    "name": "【CRAG式重试】用户没提弹性，精确日期查不到时自动放宽±3天",
+    "turns": ["2026年9月8日从上海到东京的机票"],
+    "expected_status": "results",
+    "expected_results": {
+      "relaxation_notes": "<non_empty>"
+    }
+  },
+  {
+    "id": 25,
+    "name": "【CRAG式重试】用户明确说了零弹性，系统不能自作主张放宽",
+    "turns": ["2026年9月8日从上海到东京的机票，必须是那天，不能有任何浮动"],
+    "expected_status": "error",
+    "expected_fields": {"date_flexibility_explicit": true},
+    "expected_results": {
+      "error.error_code": "NO_RESULTS",
+      "relaxation_notes": []
+    }
+  },
+  {
+    "id": 26,
+    "name": "【硬约束不能自主放弃】只有红眼航班，先追问，用户同意后才放宽",
+    "turns": [
+      "2026年9月26日从上海到东京的机票，不要红眼航班",
+      "好的，红眼也可以接受"
+    ],
+    "expected_status": "results",
+    "expected_results": {
+      "results.cheapest.outbound.flight_id": "MU5048"
+    }
+  },
+  {
+    "id": 27,
+    "name": "【硬约束不能自主放弃】只有红眼航班，用户拒绝后维持失败，不能偷偷放宽",
+    "turns": [
+      "2026年9月26日从上海到东京的机票，不要红眼航班",
+      "算了，不用了"
+    ],
+    "expected_status": "error",
+    "expected_fields": {"avoid_red_eye": true},
+    "expected_results": {
+      "error.error_code": "NO_RESULTS"
+    }
+  },
+  {
+    "id": 28,
+    "name": "【偏好画像】明确表达更看重舒适，best_overall 应该和默认权重不一样",
+    "turns": ["2026年9月18日从上海到东京，多花点钱没关系，但尽量别是红眼航班"],
+    "expected_status": "results",
+    "expected_fields": {"priority_profile": "COMFORT_FIRST"},
+    "expected_results": {
+      "results.best_overall.outbound.flight_id": "MU5047"
+    }
+  },
+  {
+    "id": 29,
+    "name": "【偏好画像】明确表达只看重价格",
+    "turns": ["2026年9月18日从上海到东京，红眼也没关系，能有多便宜就多便宜"],
+    "expected_status": "results",
+    "expected_fields": {"priority_profile": "PRICE_FIRST"},
+    "expected_results": {
+      "results.best_overall.outbound.flight_id": "MU5046"
+    }
   }
 ]

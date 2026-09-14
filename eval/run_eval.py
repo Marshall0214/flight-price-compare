@@ -29,7 +29,12 @@ SCENARIOS_PATH = Path(__file__).resolve().parent / "scenarios.json"
 RESULTS_PATH = Path(__file__).resolve().parent / "results.md"
 
 
+NON_EMPTY = "<non_empty>"  # expected_results 里用这个哨兵值表示"只要非空就行，不比较具体内容"
+
+
 def field_matches(expected, actual) -> bool:
+    if expected == NON_EMPTY:
+        return bool(actual)
     if actual is None:
         return False
     if expected == actual:
@@ -52,17 +57,19 @@ def _get_path(data: dict | None, dotted_path: str):
 
 def run_scenario(scenario: dict) -> dict:
     known_fields: dict | None = None
+    pending_confirmation: dict | None = None
     result: dict = {}
     elapsed_list: list[float] = []
     tokens_list: list[float] = []
 
     for turn in scenario["turns"]:
-        result = run_agent(turn, known_fields)
+        result = run_agent(turn, known_fields, pending_confirmation)
         elapsed_list.append(result["metrics"].get("total_elapsed_s", 0.0))
         for call in result["metrics"].get("llm_calls", []):
             usage = call.get("usage") or {}
             tokens_list.append(usage.get("total_tokens", 0))
         known_fields = result.get("request")
+        pending_confirmation = result.get("pending_confirmation")
 
     status_ok = result.get("status") == scenario["expected_status"]
 

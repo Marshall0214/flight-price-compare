@@ -101,5 +101,42 @@ def test_rank_and_tier_picks_cheapest_and_most_comfortable():
     assert ranked["most_comfortable"][0].flight_id == "R2"
 
 
+def test_rank_and_tier_price_first_profile_prefers_cheaper_even_if_red_eye():
+    cheap_red_eye = make_offer(flight_id="R1", base_price=1500, is_red_eye=True)
+    pricier_normal = make_offer(flight_id="R2", base_price=2500, is_red_eye=False)
+    priced = [
+        (cheap_red_eye, calculate_breakdown(cheap_red_eye, 0)),
+        (pricier_normal, calculate_breakdown(pricier_normal, 0)),
+    ]
+    ranked = rank_and_tier(priced, priority_profile="PRICE_FIRST")
+    assert ranked["best_overall"][0].flight_id == "R1"
+
+
+def test_rank_and_tier_comfort_first_profile_prefers_non_red_eye_despite_price():
+    cheap_red_eye = make_offer(flight_id="R1", base_price=1500, is_red_eye=True)
+    pricier_normal = make_offer(flight_id="R2", base_price=2500, is_red_eye=False)
+    priced = [
+        (cheap_red_eye, calculate_breakdown(cheap_red_eye, 0)),
+        (pricier_normal, calculate_breakdown(pricier_normal, 0)),
+    ]
+    ranked = rank_and_tier(priced, priority_profile="COMFORT_FIRST")
+    assert ranked["best_overall"][0].flight_id == "R2"
+    # cheapest/most_comfortable 两档不受 profile 影响
+    assert ranked["cheapest"][0].flight_id == "R1"
+    assert ranked["most_comfortable"][0].flight_id == "R2"
+
+
+def test_rank_and_tier_unknown_profile_falls_back_to_balanced():
+    cheap_red_eye = make_offer(flight_id="R1", base_price=1500, is_red_eye=True)
+    normal = make_offer(flight_id="R2", base_price=1550, is_red_eye=False)
+    priced = [
+        (cheap_red_eye, calculate_breakdown(cheap_red_eye, 0)),
+        (normal, calculate_breakdown(normal, 0)),
+    ]
+    balanced = rank_and_tier(priced, priority_profile="BALANCED")
+    fallback = rank_and_tier(priced, priority_profile="NOT_A_REAL_PROFILE")
+    assert fallback["best_overall"][0].flight_id == balanced["best_overall"][0].flight_id
+
+
 def test_rank_and_tier_empty_input_returns_empty_dict():
     assert rank_and_tier([]) == {}

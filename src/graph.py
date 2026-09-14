@@ -14,6 +14,7 @@ from langgraph.graph import END, StateGraph
 
 from src.nodes import (
     ask_clarification_node,
+    ask_redeye_confirmation_node,
     explain_failure_node,
     generate_response_node,
     normalize_and_dedupe_node,
@@ -38,6 +39,7 @@ def build_graph():
     graph.add_node("ask_clarification", ask_clarification_node)
     graph.add_node("resolve_airport_code", resolve_airport_code_node)
     graph.add_node("search_flights", search_flights_node)
+    graph.add_node("ask_redeye_confirmation", ask_redeye_confirmation_node)
     graph.add_node("explain_failure", explain_failure_node)
     graph.add_node("normalize_and_dedupe", normalize_and_dedupe_node)
     graph.add_node("verify_fare", verify_fare_node)
@@ -62,7 +64,11 @@ def build_graph():
     graph.add_conditional_edges(
         "search_flights",
         route_after_search,
-        {"empty": "explain_failure", "ok": "normalize_and_dedupe"},
+        {
+            "empty": "explain_failure",
+            "ok": "normalize_and_dedupe",
+            "need_redeye_confirmation": "ask_redeye_confirmation",
+        },
     )
 
     graph.add_edge("normalize_and_dedupe", "verify_fare")
@@ -70,6 +76,7 @@ def build_graph():
     graph.add_edge("rank_and_tier", "generate_response")
     graph.add_edge("generate_response", END)
     graph.add_edge("explain_failure", END)
+    graph.add_edge("ask_redeye_confirmation", END)
 
     return graph.compile()
 
@@ -81,11 +88,16 @@ def get_graph():
     return _compiled_graph
 
 
-def run_agent(user_message: str, known_fields: dict[str, Any] | None = None) -> dict[str, Any]:
+def run_agent(
+    user_message: str,
+    known_fields: dict[str, Any] | None = None,
+    pending_confirmation: dict[str, Any] | None = None,
+) -> dict[str, Any]:
     t0 = time.perf_counter()
     initial_state: AgentState = {
         "user_message": user_message,
         "request": known_fields or {},
+        "pending_confirmation": pending_confirmation,
     }
     final_state = get_graph().invoke(initial_state)
     elapsed = time.perf_counter() - t0
@@ -93,12 +105,17 @@ def run_agent(user_message: str, known_fields: dict[str, Any] | None = None) -> 
     metrics = dict(final_state.get("metrics") or {})
     metrics["total_elapsed_s"] = elapsed
 
+    status = final_state.get("status")
     return {
-        "status": final_state.get("status"),
+        "status": status,
         "message": final_state.get("final_text"),
         "request": final_state.get("request"),
         "missing_fields": final_state.get("missing_fields", []),
         "results": final_state.get("ranked_results"),
         "error": final_state.get("search_error") or final_state.get("airport_error"),
+        # 只有当前这一轮确实是"等待确认"状态时才把 pending_confirmation 传出去，
+        # 客户端要在下一次 /query 请求里原样带回来。
+        "pending_confirmation": final_state.get("pending_confirmation") if status == "clarification" else None,
+        "relaxation_notes": final_state.get("relaxation_notes") or [],
         "metrics": metrics,
     }

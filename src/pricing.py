@@ -58,10 +58,24 @@ def refresh_fare(offer: FlightOffer, now: datetime | None = None) -> FlightOffer
     return offer.model_copy(update={"queried_at": now})
 
 
+# best_overall 用哪套价格/红眼权重，由 priority_profile 决定；LLM 只负责从自然语言里
+# 挑出下面这三个 key 之一，具体的数字和计算完全是确定性代码，LLM 不参与。
+PRIORITY_PROFILE_WEIGHTS: dict[str, dict[str, float]] = {
+    "PRICE_FIRST": {"price_weight": 0.9, "red_eye_penalty": 0.1},
+    "BALANCED": {"price_weight": 0.7, "red_eye_penalty": 0.3},
+    "COMFORT_FIRST": {"price_weight": 0.4, "red_eye_penalty": 0.6},
+}
+
+
 def rank_and_tier(
     priced_offers: list[tuple[FlightOffer, PriceBreakdown]],
+    priority_profile: str = "BALANCED",
 ) -> dict[str, tuple[FlightOffer, PriceBreakdown]]:
-    """计算最便宜 / 综合最优 / 最舒适三档结果。"""
+    """计算最便宜 / 综合最优 / 最舒适三档结果。
+
+    `cheapest` 和 `most_comfortable` 是绝对档位，不受 priority_profile 影响；
+    只有 `best_overall` 的价格/舒适度权重会跟着 priority_profile 变化。
+    """
     if not priced_offers:
         return {}
 
@@ -73,11 +87,12 @@ def rank_and_tier(
 
     prices = [total(pair) for pair in priced_offers]
     min_price, max_price = min(prices), max(prices)
+    weights = PRIORITY_PROFILE_WEIGHTS.get(priority_profile, PRIORITY_PROFILE_WEIGHTS["BALANCED"])
 
     def score(pair: tuple[FlightOffer, PriceBreakdown]) -> float:
         price_norm = 0.0 if max_price == min_price else (total(pair) - min_price) / (max_price - min_price)
-        comfort_penalty = 0.3 if pair[0].is_red_eye else 0.0
-        return price_norm * 0.7 + comfort_penalty
+        red_eye_penalty = weights["red_eye_penalty"] if pair[0].is_red_eye else 0.0
+        return price_norm * weights["price_weight"] + red_eye_penalty
 
     best_overall = min(priced_offers, key=score)
 

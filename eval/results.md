@@ -1,10 +1,10 @@
 | 指标 | 数值 | 测量时间 | 模型 |
 |---|---|---|---|
-| 参数提取正确率 | 100.0% | 2026-09-14T17:10:15 | deepseek-flash |
-| 工具调用成功率 | 100.0% | 2026-09-14T17:10:15 | deepseek-flash |
-| 端到端任务完成率 | 100.0% | 2026-09-14T17:10:15 | deepseek-flash |
-| 平均响应时间 | 4809ms | 2026-09-14T17:10:15 | deepseek-flash |
-| 平均 Token 成本 | 819 tokens/请求 | 2026-09-14T17:10:15 | deepseek-flash |
+| 参数提取正确率 | 100.0% | 2026-09-14T19:26:14 | deepseek-flash |
+| 工具调用成功率 | 100.0% | 2026-09-14T19:26:14 | deepseek-flash |
+| 端到端任务完成率 | 100.0% | 2026-09-14T19:26:14 | deepseek-flash |
+| 平均响应时间 | 4530ms | 2026-09-14T19:26:14 | deepseek-flash |
+| 平均 Token 成本 | 1029 tokens/请求 | 2026-09-14T19:26:14 | deepseek-flash |
 
 | # | 场景 | 预期状态 | 实际状态 | 通过 |
 |---|---|---|---|---|
@@ -31,3 +31,9 @@
 | 21 | 机场代码合法但没有航班数据（区分于场景7的“根本不认识”） | error | error | PASS |
 | 22 | 询问式措辞（参考 ATIS 数据集里 how much is the cheapest flight 这类问法） | results | results | PASS |
 | 23 | 预订式措辞、反向路线（参考 ATIS 里 I'd like to fly from X to Y 这类问法） | results | results | PASS |
+| 24 | 【CRAG式重试】用户没提弹性，精确日期查不到时自动放宽±3天 | results | results | PASS |
+| 25 | 【CRAG式重试】用户明确说了零弹性，系统不能自作主张放宽 | error | error | PASS |
+| 26 | 【硬约束不能自主放弃】只有红眼航班，先追问，用户同意后才放宽 | results | results | PASS |
+| 27 | 【硬约束不能自主放弃】只有红眼航班，用户拒绝后维持失败，不能偷偷放宽 | error | error | PASS |
+| 28 | 【偏好画像】明确表达更看重舒适，best_overall 应该和默认权重不一样 | results | results | PASS |
+| 29 | 【偏好画像】明确表达只看重价格 | results | results | PASS |

@@ -21,6 +21,9 @@ app = FastAPI(
 class QueryRequest(BaseModel):
     message: str
     known_fields: Optional[dict[str, Any]] = None
+    # 上一次响应里的 pending_confirmation 原样带回来（比如上一轮系统问了
+    # "要不要接受红眼航班"，这一轮的回答需要靠这个字段才能被正确解读）。
+    pending_confirmation: Optional[dict[str, Any]] = None
 
 
 @app.get("/health")
@@ -30,4 +33,4 @@ def health() -> dict[str, str]:
 
 @app.post("/query")
 def query(payload: QueryRequest) -> dict[str, Any]:
-    return run_agent(payload.message, payload.known_fields)
+    return run_agent(payload.message, payload.known_fields, payload.pending_confirmation)

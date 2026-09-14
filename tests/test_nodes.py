@@ -142,3 +142,102 @@ def test_rank_and_tier_node_one_way_has_no_return_key():
     cheapest = ranked_state["ranked_results"]["cheapest"]
     assert "return" not in cheapest
     assert cheapest["total_price_cny"] == 1000.0
+
+
+# --- 约束放宽 / 重试逻辑（CRAG 式设计） ---
+
+
+def test_search_auto_widens_date_when_flexibility_not_stated():
+    # 09-08 当天完全没有航班，用户也没提过弹性 -> 应该自动放宽 ±3 天，命中 09-06/09-10 的数据
+    state = {
+        "request": {
+            "origin": "SHA",
+            "destination": "NRT",
+            "departure_date": "2026-09-08",
+            "date_flexibility_days": 0,
+            "date_flexibility_explicit": False,
+            "avoid_red_eye": False,
+        },
+        "origin_codes": ["SHA", "PVG"],
+        "destination_codes": ["NRT", "HND"],
+    }
+    result = search_flights_node(state)
+    assert result["raw_offers"]  # 放宽后应该有结果
+    assert result["relaxation_notes"] == [{"from_days": 0, "to_days": 3, "leg": "outbound"}]
+
+
+def test_search_does_not_exceed_explicit_flexibility():
+    # 同样是 09-08 没航班，但用户这次明确说了"只能弹性1天" -> 不允许系统自己超出这个范围
+    state = {
+        "request": {
+            "origin": "SHA",
+            "destination": "NRT",
+            "departure_date": "2026-09-08",
+            "date_flexibility_days": 1,
+            "date_flexibility_explicit": True,
+            "avoid_red_eye": False,
+        },
+        "origin_codes": ["SHA", "PVG"],
+        "destination_codes": ["NRT", "HND"],
+    }
+    result = search_flights_node(state)
+    assert result["raw_offers"] == []
+    assert result["relaxation_notes"] == []  # 没有偷偷放宽
+
+
+def test_search_flags_redeye_blocking_when_only_red_eye_available():
+    # 09-26 只有一趟红眼航班（MU5048），前后 3 天内没有别的航班
+    state = {
+        "request": {
+            "origin": "SHA",
+            "destination": "NRT",
+            "departure_date": "2026-09-26",
+            "date_flexibility_days": 0,
+            "date_flexibility_explicit": False,
+            "avoid_red_eye": True,
+        },
+        "origin_codes": ["SHA", "PVG"],
+        "destination_codes": ["NRT", "HND"],
+    }
+    result = search_flights_node(state)
+    assert result["raw_offers"] == []
+    assert result["redeye_blocking"] is True
+
+
+def test_search_no_redeye_blocking_when_genuinely_no_data_at_all():
+    # 新加坡完全没有 mock 数据，不该被误判成"红眼在挡路"
+    state = {
+        "request": {
+            "origin": "SHA",
+            "destination": "新加坡",
+            "departure_date": "2026-09-10",
+            "date_flexibility_days": 0,
+            "date_flexibility_explicit": False,
+            "avoid_red_eye": True,
+        },
+        "origin_codes": ["SHA", "PVG"],
+        "destination_codes": ["SIN"],
+    }
+    result = search_flights_node(state)
+    assert result["raw_offers"] == []
+    assert result["redeye_blocking"] is False
+
+
+def test_route_after_search_routes_to_redeye_confirmation():
+    state = {
+        "request": {"departure_date": "2026-09-26", "trip_duration_days": None},
+        "raw_offers": [],
+        "raw_return_offers": [],
+        "redeye_blocking": True,
+    }
+    assert route_after_search(state) == "need_redeye_confirmation"
+
+
+def test_route_after_search_plain_empty_when_not_redeye_blocking():
+    state = {
+        "request": {"departure_date": "2026-09-10", "trip_duration_days": None},
+        "raw_offers": [],
+        "raw_return_offers": [],
+        "redeye_blocking": False,
+    }
+    assert route_after_search(state) == "empty"

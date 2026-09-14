@@ -253,5 +253,20 @@
     "tax_and_fees": 2500,
     "source": "mock_b",
     "queried_at": "2026-09-13T10:00:00+08:00"
+  },
+  {
+    "flight_id": "MU5048",
+    "origin": "SHA",
+    "destination": "NRT",
+    "departure_time": "2026-09-26T23:50:00+08:00",
+    "arrival_time": "2026-09-27T04:00:00+09:00",
+    "is_red_eye": true,
+    "airline": "MU",
+    "base_price": 1350,
+    "currency": "CNY",
+    "baggage_fee_per_20kg": 200,
+    "tax_and_fees": 120,
+    "source": "mock_a",
+    "queried_at": "2026-09-13T10:00:00+08:00"
   }
 ]
