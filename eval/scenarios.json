@@ -7,9 +7,12 @@
   },
   {
     "id": 2,
-    "name": "正常往返查询（信息完整）",
+    "name": "正常往返查询（信息完整，真正搜索回程）",
     "turns": ["帮我查2026年9月10日从上海到东京，9月15日回上海的往返机票"],
-    "expected_status": "results"
+    "expected_status": "results",
+    "expected_results": {
+      "cheapest.return.flight_id": "NH921"
+    }
   },
   {
     "id": 3,
@@ -31,7 +34,7 @@
   },
   {
     "id": 6,
-    "name": "模糊/弹性日期",
+    "name": "模糊/弹性日期（上旬）",
     "turns": ["9月上旬想从上海去东京，日期可以有两三天弹性，帮我找便宜点的"],
     "expected_status": "results"
   },
@@ -43,24 +46,107 @@
   },
   {
     "id": 8,
-    "name": "无符合条件结果",
+    "name": "无符合条件结果（新加坡完全没有航班数据）",
     "turns": ["帮我查一下2026年9月10日从上海到新加坡的机票"],
     "expected_status": "error"
   },
   {
     "id": 9,
-    "name": "用户中途修改条件",
+    "name": "用户中途修改目的地（改后确实有航班）",
     "turns": [
       "帮我查一下2026年9月10日从上海到东京的机票",
       "算了，改成去北京吧"
     ],
-    "expected_status": "error",
-    "expected_fields": {"destination": "北京"}
+    "expected_status": "results",
+    "expected_fields": {"destination": "北京"},
+    "expected_results": {
+      "cheapest.outbound.flight_id": "CA1831"
+    }
   },
   {
     "id": 10,
     "name": "特殊偏好组合（避免红眼 + 20kg行李）",
     "turns": ["2026年9月12日从上海去东京，带20公斤行李，绝对不要红眼航班"],
+    "expected_status": "results",
+    "expected_results": {
+      "cheapest.outbound.flight_id": "MU5044"
+    }
+  },
+  {
+    "id": 11,
+    "name": "直接用机场代码而非城市名查询",
+    "turns": ["2026年9月10日从PVG到HND的机票"],
+    "expected_status": "results",
+    "expected_results": {
+      "cheapest.outbound.flight_id": "NH920"
+    }
+  },
+  {
+    "id": 12,
+    "name": "行李21公斤，验证按20kg一档向上取整",
+    "turns": ["2026年9月10日从上海到东京，行李21公斤，不要红眼航班"],
+    "expected_status": "results"
+  },
+  {
+    "id": 13,
+    "name": "不带行李（0kg）",
+    "turns": ["2026年9月10日从上海到东京，不用带托运行李"],
+    "expected_status": "results",
+    "expected_fields": {"checked_baggage_kg": 0}
+  },
+  {
+    "id": 14,
+    "name": "明确接受红眼航班，验证红眼可以赢得最便宜档",
+    "turns": ["2026年9月18日从上海到东京，我不介意红眼航班，只要最便宜的就行"],
+    "expected_status": "results",
+    "expected_fields": {"avoid_red_eye": false},
+    "expected_results": {
+      "cheapest.outbound.flight_id": "MU5046"
+    }
+  },
+  {
+    "id": 15,
+    "name": "往返 + 避免红眼组合",
+    "turns": ["2026年9月10日从上海到东京，9月15日回上海，往返都不要红眼航班"],
+    "expected_status": "results"
+  },
+  {
+    "id": 16,
+    "name": "往返查询但回程日期没有航班数据",
+    "turns": ["2026年9月18日从上海到东京，玩5天后回上海"],
+    "expected_status": "error"
+  },
+  {
+    "id": 17,
+    "name": "新目的地：曼谷单程查询（验证USD换算）",
+    "turns": ["2026年9月11日从上海到曼谷的机票"],
+    "expected_status": "results",
+    "expected_results": {
+      "cheapest.outbound.flight_id": "FD588"
+    }
+  },
+  {
+    "id": 18,
+    "name": "曼谷往返查询",
+    "turns": ["2026年9月11日从上海到曼谷，9月16日回上海的往返机票"],
+    "expected_status": "results",
+    "expected_results": {
+      "cheapest.return.flight_id": "FD589"
+    }
+  },
+  {
+    "id": 19,
+    "name": "模糊日期（下旬）",
+    "turns": ["9月下旬想从上海去东京，大概一周弹性都可以"],
+    "expected_status": "results"
+  },
+  {
+    "id": 20,
+    "name": "一次性缺两个必要字段，用户一轮补全",
+    "turns": [
+      "帮我查一下去东京的机票",
+      "从上海出发，2026年9月10日"
+    ],
     "expected_status": "results"
   }
 ]

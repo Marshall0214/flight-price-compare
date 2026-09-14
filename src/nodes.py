@@ -6,6 +6,7 @@
 from __future__ import annotations
 
 import time
+from datetime import date, timedelta
 
 from src.llm import chat_json, chat_text
 from src.models import FlightOffer, FlightSearchRequest, PriceBreakdown
@@ -29,7 +30,11 @@ date_flexibility_days(int), checked_baggage_kg(int), avoid_red_eye(bool)。
    并把 date_flexibility_days 设为能覆盖整个区间所需的天数（例如“上旬”约为中间日期 ±5 天）；
    如果用户同时另外说了具体的弹性天数，以用户明确说的天数为准。用户完全没提年份时默认使用 2026 年。
    只有在用户完全没有给出任何日期线索时，departure_date 才保持 null。
-6. 只输出 JSON，不要输出任何解释性文字。"""
+6. 如果用户提到了往返/回程，并且明确说了返程日期（例如“9月10日去，9月15日回”），
+   把 trip_duration_days 设为“返程日期 - 出发日期”的天数（此例中是 5）；
+   如果用户直接说了行程天数（例如“玩5天”），直接使用该数字。
+   如果用户没有提到往返或行程天数，trip_duration_days 保持 null（表示单程查询）。
+7. 只输出 JSON，不要输出任何解释性文字。"""
 
 
 def _log_llm_call(state: AgentState, node: str, usage: dict, elapsed: float | None = None) -> dict:
@@ -96,23 +101,46 @@ def route_after_airport(state: AgentState) -> str:
     return "error" if state.get("airport_error") else "ok"
 
 
+def _is_round_trip(request: dict) -> bool:
+    """trip_duration_days 有值就代表用户想要往返（配合 departure_date 推出返程日期）；
+    单程查询里这个字段应该是 null（见 PARSE_SYSTEM_PROMPT 规则 6）。"""
+    return bool(request.get("trip_duration_days"))
+
+
 def search_flights_node(state: AgentState) -> AgentState:
     request = state["request"]
-    offers = search_offers(
-        state["origin_codes"],
-        state["destination_codes"],
-        request.get("departure_date"),
-        request.get("date_flexibility_days") or 0,
+    flex = request.get("date_flexibility_days") or 0
+
+    def _filtered(offers):
+        if request.get("avoid_red_eye"):
+            return [o for o in offers if not o.is_red_eye]
+        return offers
+
+    outbound = _filtered(
+        search_offers(state["origin_codes"], state["destination_codes"], request.get("departure_date"), flex)
     )
-    # avoid_red_eye 是用户明确表达的硬约束（"不要红眼航班"），不是软偏好，
-    # 所以在这里直接过滤掉，而不是留到 rank_and_tier 只做轻微降权。
-    if request.get("avoid_red_eye"):
-        offers = [o for o in offers if not o.is_red_eye]
-    return {"raw_offers": [o.model_dump(mode="json") for o in offers]}
+
+    return_offers = []
+    if _is_round_trip(request) and request.get("departure_date"):
+        return_date = (
+            date.fromisoformat(request["departure_date"]) + timedelta(days=request["trip_duration_days"])
+        ).isoformat()
+        return_offers = _filtered(
+            search_offers(state["destination_codes"], state["origin_codes"], return_date, flex)
+        )
+
+    return {
+        "raw_offers": [o.model_dump(mode="json") for o in outbound],
+        "raw_return_offers": [o.model_dump(mode="json") for o in return_offers],
+    }
 
 
 def route_after_search(state: AgentState) -> str:
-    return "ok" if state.get("raw_offers") else "empty"
+    if not state.get("raw_offers"):
+        return "empty"
+    if _is_round_trip(state["request"]) and not state.get("raw_return_offers"):
+        return "empty"  # 往返查询里，去程有结果但回程没有，同样算查询失败
+    return "ok"
 
 
 def explain_failure_node(state: AgentState) -> AgentState:
@@ -132,46 +160,69 @@ def explain_failure_node(state: AgentState) -> AgentState:
     }
 
 
-def normalize_and_dedupe_node(state: AgentState) -> AgentState:
-    offers = [FlightOffer(**o) for o in state["raw_offers"]]
-    offers = dedupe_offers(offers)
-    baggage_kg = state["request"].get("checked_baggage_kg") or 0
-
-    priced = [
+def _price_offers(raw_offers: list[dict], baggage_kg: int) -> list[dict]:
+    offers = dedupe_offers([FlightOffer(**o) for o in raw_offers])
+    return [
         {
             "offer": offer.model_dump(mode="json"),
             "breakdown": calculate_breakdown(offer, baggage_kg).model_dump(),
         }
         for offer in offers
     ]
-    return {"priced_offers": priced}
+
+
+def normalize_and_dedupe_node(state: AgentState) -> AgentState:
+    baggage_kg = state["request"].get("checked_baggage_kg") or 0
+    return {
+        "priced_offers": _price_offers(state["raw_offers"], baggage_kg),
+        "priced_return_offers": _price_offers(state.get("raw_return_offers") or [], baggage_kg),
+    }
+
+
+def _refresh_priced_offers(priced_offers: list[dict]) -> list[dict]:
+    refreshed = []
+    for item in priced_offers:
+        offer = refresh_fare(FlightOffer(**item["offer"]))
+        refreshed.append({"offer": offer.model_dump(mode="json"), "breakdown": item["breakdown"]})
+    return refreshed
 
 
 def verify_fare_node(state: AgentState) -> AgentState:
-    refreshed = []
-    for item in state["priced_offers"]:
-        offer = refresh_fare(FlightOffer(**item["offer"]))
-        refreshed.append({"offer": offer.model_dump(mode="json"), "breakdown": item["breakdown"]})
-    return {"priced_offers": refreshed}
+    return {
+        "priced_offers": _refresh_priced_offers(state["priced_offers"]),
+        "priced_return_offers": _refresh_priced_offers(state.get("priced_return_offers") or []),
+    }
+
+
+def _tier_entry(offer: FlightOffer, breakdown: PriceBreakdown) -> dict:
+    return {
+        "flight_id": offer.flight_id,
+        "total_price_cny": breakdown.total_cny,
+        "breakdown": breakdown.model_dump(),
+        "source": offer.source,
+        "queried_at": offer.queried_at.isoformat(),
+    }
 
 
 def rank_and_tier_node(state: AgentState) -> AgentState:
-    pairs = [
-        (FlightOffer(**item["offer"]), PriceBreakdown(**item["breakdown"]))
-        for item in state["priced_offers"]
-    ]
-    ranked = rank_and_tier(pairs)
+    def _to_pairs(priced_offers: list[dict]):
+        return [
+            (FlightOffer(**item["offer"]), PriceBreakdown(**item["breakdown"])) for item in priced_offers
+        ]
+
+    ranked_out = rank_and_tier(_to_pairs(state["priced_offers"]))
+    ranked_ret = rank_and_tier(_to_pairs(state.get("priced_return_offers") or []))
 
     result = {}
-    for tier, (offer, breakdown) in ranked.items():
-        result[tier] = {
-            "tier": tier,
-            "flight_id": offer.flight_id,
-            "total_price_cny": breakdown.total_cny,
-            "breakdown": breakdown.model_dump(),
-            "source": offer.source,
-            "queried_at": offer.queried_at.isoformat(),
-        }
+    for tier, (offer, breakdown) in ranked_out.items():
+        entry = {"tier": tier, "outbound": _tier_entry(offer, breakdown)}
+        if tier in ranked_ret:
+            r_offer, r_breakdown = ranked_ret[tier]
+            entry["return"] = _tier_entry(r_offer, r_breakdown)
+            entry["total_price_cny"] = round(breakdown.total_cny + r_breakdown.total_cny, 2)
+        else:
+            entry["total_price_cny"] = breakdown.total_cny
+        result[tier] = entry
     return {"ranked_results": result}
 
 

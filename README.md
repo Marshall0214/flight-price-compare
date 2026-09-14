@@ -2,7 +2,7 @@
 
 用自然语言描述一次出行需求，Agent 自动补全缺失信息、调用航班搜索工具、用确定性代码完成价格计算与排序，最终给出「最便宜 / 综合最优 / 最舒适」三档结果，并标注数据来源与查询时间。
 
-> **项目状态**：代码已实现、测试已跑通、评测已完成。`pytest`（22 个用例）全部通过；10 场景评测集在 `deepseek-flash` 上实测参数提取正确率 100%、工具调用成功率 100%、端到端任务完成率 100%，平均响应时间约 3.7s，平均 Token 成本约 600 tokens/请求（详见 `eval/results.md`，测量于 2026-09-14）。评测第一次跑时只有 60%/80%，过程中发现并修复了两处真实问题（`avoid_red_eye` 未真正过滤、模糊日期解析缺失），详见 [docs/resume-guide.md](docs/resume-guide.md)。
+> **项目状态**：代码已实现、测试已跑通、评测已完成。`pytest`（28 个用例）全部通过；20 场景评测集在 `deepseek-flash` 上实测参数提取正确率 100%、工具调用成功率 100%、端到端任务完成率 100%，平均响应时间约 4.5s，平均 Token 成本约 770 tokens/请求（详见 `eval/results.md`，测量于 2026-09-14）。评测集最初只有 10 个场景、只检查状态码，后来扩充到 20 个并加入了对实际选中航班的业务结果校验（不只是"状态对不对"，而是"选出来的那趟航班对不对"）；扩充过程中还顺带发现并修复了一个真实 bug——往返查询解析出了行程天数却从没真正用它搜索过回程航班。完整的踩坑记录见 [docs/resume-guide.md](docs/resume-guide.md)。
 
 ## 这个项目在解决什么问题
 
@@ -16,7 +16,7 @@
 - **三档结果**：最便宜 / 综合最优 / 最舒适，每条结果标注数据来源与查询时间。
 - **面向 MCP 的工具设计**：`search_flights` 等工具遵循 MCP tool schema 风格定义，并提供一个最小 MCP Server 封装，便于后续独立拆分。
 - **服务化**：FastAPI 提供 `/query` HTTP 接口，自带 Swagger UI，可直接在浏览器里发起请求做演示。
-- **可验证的质量**：pytest 覆盖价格计算、去重、排序等确定性逻辑；固定的 10 场景评测集给出真实的参数提取正确率、任务完成率、响应时间与 Token 成本。
+- **可验证的质量**：pytest 覆盖价格计算、去重、排序等确定性逻辑；固定的 20 场景评测集不仅检查状态码，还校验实际选中的航班是否正确，给出真实的参数提取正确率、任务完成率、响应时间与 Token 成本。
 
 ## 系统架构
 
@@ -82,7 +82,7 @@ curl -X POST http://127.0.0.1:8000/query \
   -d '{"message": "帮我看看9月从上海去东京，玩5天，带一个20kg托运行李，不要红眼航班"}'
 ```
 
-响应结构示例（字段结构真实，具体数值取决于你配置的模型和请求参数；`status` 会是 `results`/`clarification`/`error` 三者之一）：
+响应结构示例（字段结构真实，具体数值取决于你配置的模型和请求参数；`status` 会是 `results`/`clarification`/`error` 三者之一）。单程查询只有 `outbound`，往返查询（`trip_duration_days` 有值）会同时带上 `return` 和合计的 `total_price_cny`：
 
 ```json
 {
@@ -90,9 +90,14 @@ curl -X POST http://127.0.0.1:8000/query \
   "message": "已为你找到 3 档结果，均来自 mock 数据源...",
   "missing_fields": [],
   "results": {
-    "cheapest": { "tier": "cheapest", "flight_id": "NH920", "total_price_cny": 1800.0, "source": "mock_b", "queried_at": "2026-09-14T08:00:00+00:00" },
-    "best_overall": { "tier": "best_overall", "flight_id": "NH920", "total_price_cny": 1800.0, "source": "mock_b", "queried_at": "2026-09-14T08:00:00+00:00" },
-    "most_comfortable": { "tier": "most_comfortable", "flight_id": "NH920", "total_price_cny": 1800.0, "source": "mock_b", "queried_at": "2026-09-14T08:00:00+00:00" }
+    "cheapest": {
+      "tier": "cheapest",
+      "outbound": { "flight_id": "NH920", "total_price_cny": 1800.0, "source": "mock_b", "queried_at": "2026-09-14T08:00:00+00:00" },
+      "return": { "flight_id": "NH921", "total_price_cny": 1656.0, "source": "mock_b", "queried_at": "2026-09-14T08:00:00+00:00" },
+      "total_price_cny": 3456.0
+    },
+    "best_overall": { "tier": "best_overall", "outbound": { "...": "结构同上" } },
+    "most_comfortable": { "tier": "most_comfortable", "outbound": { "...": "结构同上" } }
   }
 }
 ```
@@ -113,7 +118,7 @@ pytest -q
 python -m eval.run_eval
 ```
 
-`pytest` 覆盖价格计算、币种换算、去重、验价、红眼过滤等确定性逻辑，随时可以在没有网络/API Key 的情况下运行。`eval/run_eval.py` 会跑 10 个固定场景并把参数提取正确率、工具调用成功率、端到端任务完成率、平均响应时间与平均 Token 成本写入 `eval/results.md`——这一步需要真实的 LLM 调用，数字必须由你自己跑出来。
+`pytest` 覆盖价格计算、币种换算、去重、验价、红眼过滤、往返回程搜索等确定性逻辑，随时可以在没有网络/API Key 的情况下运行。`eval/run_eval.py` 会跑 20 个固定场景并把参数提取正确率、工具调用成功率、端到端任务完成率、平均响应时间与平均 Token 成本写入 `eval/results.md`——这一步需要真实的 LLM 调用，数字必须由你自己跑出来。
 
 ## 项目结构
 
@@ -136,7 +141,9 @@ flight-price-compare/
 - 当前数据源为本地 mock 数据，未接入真实机票供应商 API。
 - MCP 封装为最小可用版本（单工具），未按独立项目标准补全测试与文档。
 - 暂无用户偏好记忆（Memory），无持久化存储。
-- 评测集为 10 个固定场景，不覆盖多数据源并发失败、限流等生产场景。
+- 评测集为 20 个固定场景，不覆盖多数据源并发失败、限流等生产场景。
+- 状态合并无法显式"清空"一个已知字段（比如先说往返、后说不用回程了，行程天数不会被清空），详见 `docs/requirements.md` 第 14 节。
+- 往返定价按"去程回程各自独立分档、同档位配对求和"计算，不做全组合最优搜索。
 
 完整的验收标准、评测方法与限制说明见 [docs/requirements.md](docs/requirements.md)。
 

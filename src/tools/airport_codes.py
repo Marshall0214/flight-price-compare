@@ -12,6 +12,7 @@ CITY_TO_AIRPORTS: dict[str, list[str]] = {
     "东京": ["NRT", "HND"],
     "新加坡": ["SIN"],
     "北京": ["PEK", "PKX"],
+    "曼谷": ["BKK"],
 }
 
 KNOWN_AIRPORT_CODES: set[str] = {code for codes in CITY_TO_AIRPORTS.values() for code in codes}

@@ -29,13 +29,25 @@ SCENARIOS_PATH = Path(__file__).resolve().parent / "scenarios.json"
 RESULTS_PATH = Path(__file__).resolve().parent / "results.md"
 
 
-def field_matches(expected: str, actual: str | None) -> bool:
-    if not actual:
+def field_matches(expected, actual) -> bool:
+    if actual is None:
         return False
     if expected == actual:
         return True
-    codes = CITY_TO_AIRPORTS.get(expected, [])
-    return actual.upper() in codes or expected in str(actual)
+    if isinstance(expected, str) and isinstance(actual, str):
+        codes = CITY_TO_AIRPORTS.get(expected, [])
+        return actual.upper() in codes or expected in actual
+    return False
+
+
+def _get_path(data: dict | None, dotted_path: str):
+    """按 'cheapest.outbound.flight_id' 这样的路径从嵌套 dict 里取值，取不到返回 None。"""
+    node = data or {}
+    for key in dotted_path.split("."):
+        if not isinstance(node, dict):
+            return None
+        node = node.get(key)
+    return node
 
 
 def run_scenario(scenario: dict) -> dict:
@@ -53,10 +65,18 @@ def run_scenario(scenario: dict) -> dict:
         known_fields = result.get("request")
 
     status_ok = result.get("status") == scenario["expected_status"]
+
     fields_ok = True
     for field, expected in scenario.get("expected_fields", {}).items():
         actual = (result.get("request") or {}).get(field)
         fields_ok = fields_ok and field_matches(expected, actual)
+
+    # expected_results 校验的是真正的业务结果（比如哪趟航班赢得了 cheapest），
+    # 不只是状态码——这是让评测集不止"跑通"而是"结果对"的关键。
+    results_ok = True
+    for dotted_path, expected in scenario.get("expected_results", {}).items():
+        actual = _get_path(result.get("results"), dotted_path)
+        results_ok = results_ok and field_matches(expected, actual)
 
     return {
         "id": scenario["id"],
@@ -65,7 +85,8 @@ def run_scenario(scenario: dict) -> dict:
         "actual_status": result.get("status"),
         "status_ok": status_ok,
         "fields_ok": fields_ok,
-        "task_completed": status_ok and fields_ok,
+        "results_ok": results_ok,
+        "task_completed": status_ok and fields_ok and results_ok,
         "avg_elapsed_s": statistics.mean(elapsed_list) if elapsed_list else 0.0,
         "avg_tokens": statistics.mean(tokens_list) if tokens_list else 0.0,
     }

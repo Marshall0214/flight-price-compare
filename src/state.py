@@ -13,7 +13,9 @@ class AgentState(TypedDict, total=False):
     destination_codes: list[str]
     airport_error: dict[str, Any]
     raw_offers: list[dict[str, Any]]
+    raw_return_offers: list[dict[str, Any]]
     priced_offers: list[dict[str, Any]]
+    priced_return_offers: list[dict[str, Any]]
     ranked_results: dict[str, Any]
     search_error: dict[str, Any]
     final_text: str
