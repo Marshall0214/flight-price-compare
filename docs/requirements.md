@@ -238,7 +238,7 @@ flight-price-compare/
 ├── src/
 │   ├── app.py                # FastAPI 入口
 │   ├── graph.py               # LangGraph 图定义 + run_agent()
-│   ├── nodes.py                # 9 个图节点的实现（合并成一个文件，一天版无需拆包）
+│   ├── nodes.py                # 10 个图节点的实现（合并成一个文件，一天版无需拆包）
 │   ├── state.py                 # AgentState TypedDict
 │   ├── tools/                    # search_flights / resolve_airport_code（MCP-style schema）
 │   ├── mcp_server.py             # 最小 MCP Server 封装
@@ -252,7 +252,7 @@ flight-price-compare/
 ├── data/
 │   └── mock_flights.json
 ├── eval/
-│   ├── scenarios.json                 # 10 个评测场景
+│   ├── scenarios.json                 # 29 个评测场景（最初规划 10 个，见第 13.1 节的三轮扩充过程）
 │   ├── run_eval.py                     # 跑评测并输出指标
 │   └── results.md                       # 真实跑分记录（需配置 LLM_API_KEY 后生成）
 └── .env.example
