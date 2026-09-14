@@ -97,7 +97,7 @@ curl -X POST http://127.0.0.1:8000/query \
   "results": {
     "cheapest": {
       "tier": "cheapest",
-      "outbound": { "flight_id": "NH920", "total_price_cny": 1800.0, "source": "mock_b", "queried_at": "2026-09-14T08:00:00+00:00" },
+      "outbound": { "flight_id": "NH920", "airline": "NH", "departure_time": "2026-09-10T09:00:00+09:00", "arrival_time": "2026-09-10T11:30:00+09:00", "is_red_eye": false, "total_price_cny": 1800.0, "source": "mock_b", "queried_at": "2026-09-14T08:00:00+00:00" },
       "return": { "flight_id": "NH921", "total_price_cny": 1656.0, "source": "mock_b", "queried_at": "2026-09-14T08:00:00+00:00" },
       "total_price_cny": 3456.0
     },
@@ -113,6 +113,20 @@ curl -X POST http://127.0.0.1:8000/query \
 
 ```bash
 python -m src.mcp_server
+```
+
+## 本地演示（Streamlit）
+
+一个对话式的本地演示页，用来现场演示和录 GIF，不做在线部署。它只是 `/query` 的一个客户端，
+所有对话状态仍由页面自己在多轮请求间原样回传（服务端无状态的设计没有变），不需要改动后端代码。
+
+```bash
+# 先在一个终端启动后端
+uvicorn src.app:app --reload
+
+# 再另开一个终端，安装演示专用依赖并启动
+pip install -r requirements-demo.txt
+streamlit run demo/streamlit_app.py
 ```
 
 ## 运行测试与评测
@@ -136,10 +150,13 @@ flight-price-compare/
 │   ├── requirements.md      # 完整需求分析
 │   └── resume-guide.md      # 简历与面试话术准备
 ├── src/                      # Agent、工具、FastAPI、MCP Server 实现
+├── demo/
+│   └── streamlit_app.py      # 本地演示页（对话式调用 /query，不做在线部署）
 ├── tests/                     # pytest 单元测试
 ├── data/
 │   └── mock_flights.json     # 模拟航班数据
 ├── eval/                      # 评测脚本与场景定义
+├── requirements-demo.txt      # 演示页专用依赖（streamlit / requests）
 └── .env.example
 ```
 
@@ -162,7 +179,7 @@ flight-price-compare/
 - 将 MCP 封装升级为独立完整项目：细化工具集、结构化错误、测试与文档。
 - 增加用户偏好记忆（常用出发城市、行李、航司、币种），需用户明确确认。
 - 引入结构化日志 / LangSmith 等 Tracing 方案，补充 P95 响应时间与失败恢复成功率。
-- 提供 Web 前端或 Streamlit 演示页与在线部署地址。
+- 在线部署地址（目前只有本地 Streamlit 演示页，见「本地演示」一节，不做长期在线托管）。
 - **预定模块（如果做）需要 human-in-the-loop 确认环节**：参考 LangGraph 官方客服机器人教程的设计——占座、扣款这类不可逆操作执行前，必须用 `interrupt()` 之类的机制暂停、等用户明确点头再继续。当前项目没有这个环节不是遗漏，而是现在只做比价推荐、没有任何不可逆操作需要确认；一旦引入预定，这里就是必须补上确认环节的地方。
 
 ## 学习路径背景

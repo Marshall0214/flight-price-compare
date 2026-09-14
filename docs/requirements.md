@@ -130,6 +130,10 @@
   "tier": "cheapest",
   "outbound": {
     "flight_id": "MU5042-2026-09-10",
+    "airline": "MU",
+    "departure_time": "2026-09-10T23:55:00+08:00",
+    "arrival_time": "2026-09-11T04:10:00+09:00",
+    "is_red_eye": true,
     "total_price_cny": 1900,
     "breakdown": { "base_price": 1580, "baggage_fee": 200, "tax_and_fees": 120 },
     "source": "mock",

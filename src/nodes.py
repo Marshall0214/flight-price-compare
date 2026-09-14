@@ -325,6 +325,10 @@ def verify_fare_node(state: AgentState) -> AgentState:
 def _tier_entry(offer: FlightOffer, breakdown: PriceBreakdown) -> dict:
     return {
         "flight_id": offer.flight_id,
+        "airline": offer.airline,
+        "departure_time": offer.departure_time.isoformat(),
+        "arrival_time": offer.arrival_time.isoformat(),
+        "is_red_eye": offer.is_red_eye,
         "total_price_cny": breakdown.total_cny,
         "breakdown": breakdown.model_dump(),
         "source": offer.source,
