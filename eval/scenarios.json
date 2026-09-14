@@ -1,0 +1,66 @@
+[
+  {
+    "id": 1,
+    "name": "正常单程查询（信息完整）",
+    "turns": ["帮我查一下2026年9月10日从上海到东京的机票，行李20公斤，不要红眼航班"],
+    "expected_status": "results"
+  },
+  {
+    "id": 2,
+    "name": "正常往返查询（信息完整）",
+    "turns": ["帮我查2026年9月10日从上海到东京，9月15日回上海的往返机票"],
+    "expected_status": "results"
+  },
+  {
+    "id": 3,
+    "name": "缺出发地",
+    "turns": ["帮我查一下2026年9月10日去东京的机票"],
+    "expected_status": "clarification"
+  },
+  {
+    "id": 4,
+    "name": "缺目的地",
+    "turns": ["帮我查一下2026年9月10日从上海出发的机票"],
+    "expected_status": "clarification"
+  },
+  {
+    "id": 5,
+    "name": "缺日期",
+    "turns": ["帮我查一下从上海到东京的机票"],
+    "expected_status": "clarification"
+  },
+  {
+    "id": 6,
+    "name": "模糊/弹性日期",
+    "turns": ["9月上旬想从上海去东京，日期可以有两三天弹性，帮我找便宜点的"],
+    "expected_status": "results"
+  },
+  {
+    "id": 7,
+    "name": "错误机场代码",
+    "turns": ["帮我查一下2026年9月10日从ABC到东京的机票"],
+    "expected_status": "error"
+  },
+  {
+    "id": 8,
+    "name": "无符合条件结果",
+    "turns": ["帮我查一下2026年9月10日从上海到新加坡的机票"],
+    "expected_status": "error"
+  },
+  {
+    "id": 9,
+    "name": "用户中途修改条件",
+    "turns": [
+      "帮我查一下2026年9月10日从上海到东京的机票",
+      "算了，改成去北京吧"
+    ],
+    "expected_status": "error",
+    "expected_fields": {"destination": "北京"}
+  },
+  {
+    "id": 10,
+    "name": "特殊偏好组合（避免红眼 + 20kg行李）",
+    "turns": ["2026年9月12日从上海去东京，带20公斤行李，绝对不要红眼航班"],
+    "expected_status": "results"
+  }
+]

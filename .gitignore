@@ -1,3 +1,7 @@
-.agents
-.claude
-skills-lock.json
+__pycache__/
+*.pyc
+.env
+.venv/
+venv/
+.pytest_cache/
+*.egg-info/

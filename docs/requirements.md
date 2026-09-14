@@ -158,6 +158,8 @@ flowchart TD
 
 这个划分本身是一个重要的面试讲解点：哪些环节必须让 LLM 做判断（理解自然语言、生成追问/解释文案），哪些环节绝不能让 LLM 参与（任何涉及金额、排序、去重的计算）。
 
+> **实现说明**：`avoid_red_eye` 是用户明确表达的硬约束（"不要红眼航班"），不是一个仅影响排序权重的软偏好。因此在 `search_flights` 节点里就会把红眼航班直接过滤掉，而不是留到 `rank_and_tier` 只做轻微降权——否则一趟很便宜的红眼航班仍可能被判定为"最便宜/综合最优"，与用户的明确要求矛盾。这是编码阶段发现并修正的一处设计细节，对应评测场景 10 的验证点。
+
 ## 8. MCP 兼容设计
 
 - `search_flights`（以及后续 `resolve_airport_code`、`verify_fare`）的输入输出使用清晰的 JSON Schema 定义，字段带说明，错误返回结构化（`{"error_code": ..., "message": ...}`），这本身就是 MCP tool 的标准写法。
@@ -182,27 +184,35 @@ flowchart TD
 ```text
 flight-price-compare/
 ├── README.md
+├── conftest.py               # 让 pytest 把项目根目录当 rootdir，src.xxx 可正常导入
+├── pyproject.toml / requirements.txt
 ├── docs/
 │   ├── requirements.md
 │   └── resume-guide.md
 ├── src/
-│   ├── app.py              # FastAPI 入口
-│   ├── graph.py            # LangGraph 图定义
-│   ├── nodes/               # 各节点实现
-│   ├── tools/                # search_flights 等工具（MCP-style schema）
-│   ├── mcp_server.py        # 最小 MCP Server 封装
-│   ├── pricing.py           # 总价计算/排序/去重/验价（确定性逻辑）
-│   └── models.py             # Pydantic 数据模型
+│   ├── app.py                # FastAPI 入口
+│   ├── graph.py               # LangGraph 图定义 + run_agent()
+│   ├── nodes.py                # 9 个图节点的实现（合并成一个文件，一天版无需拆包）
+│   ├── state.py                 # AgentState TypedDict
+│   ├── tools/                    # search_flights / resolve_airport_code（MCP-style schema）
+│   ├── mcp_server.py             # 最小 MCP Server 封装
+│   ├── pricing.py                # 总价计算/去重/验价/排序（确定性逻辑）
+│   ├── llm.py                     # OpenAI-compatible 客户端薄封装
+│   └── models.py                   # Pydantic 数据模型
 ├── tests/
-│   └── test_pricing.py       # 确定性逻辑单元测试
+│   ├── test_pricing.py             # 确定性价格逻辑单元测试
+│   ├── test_tools.py                # 机场解析 / 航班搜索单元测试
+│   └── test_nodes.py                 # 节点级测试（如 avoid_red_eye 过滤规则）
 ├── data/
 │   └── mock_flights.json
 ├── eval/
-│   ├── scenarios.json        # 10 个评测场景
-│   ├── run_eval.py           # 跑评测并输出指标
-│   └── results.md             # 真实跑分记录（供 resume-guide 引用）
+│   ├── scenarios.json                 # 10 个评测场景
+│   ├── run_eval.py                     # 跑评测并输出指标
+│   └── results.md                       # 真实跑分记录（需配置 LLM_API_KEY 后生成）
 └── .env.example
 ```
+
+实际实现比这里最初设想的结构略简单：把 `nodes/` 目录合并成单个 `nodes.py`（9 个节点体量不大，拆包是不必要的抽象），并补充了 `state.py`、`conftest.py`。这是编码阶段的合理简化，不影响第 4/7 节描述的功能范围。
 
 ## 11. 任务清单（有序，不锁死具体钟点）
 

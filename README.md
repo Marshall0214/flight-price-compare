@@ -2,7 +2,7 @@
 
 用自然语言描述一次出行需求，Agent 自动补全缺失信息、调用航班搜索工具、用确定性代码完成价格计算与排序，最终给出「最便宜 / 综合最优 / 最舒适」三档结果，并标注数据来源与查询时间。
 
-> **项目状态**：需求分析与技术方案已定稿（见 [docs/requirements.md](docs/requirements.md)），代码实现进行中。下面的「快速开始」描述的是设计目标的运行方式，评测数字会在跑通评测集后由真实结果替换，不做预先编造。
+> **项目状态**：代码已实现、测试已跑通、评测已完成。`pytest`（22 个用例）全部通过；10 场景评测集在 `deepseek-flash` 上实测参数提取正确率 100%、工具调用成功率 100%、端到端任务完成率 100%，平均响应时间约 3.7s，平均 Token 成本约 600 tokens/请求（详见 `eval/results.md`，测量于 2026-09-14）。评测第一次跑时只有 60%/80%，过程中发现并修复了两处真实问题（`avoid_red_eye` 未真正过滤、模糊日期解析缺失），详见 [docs/resume-guide.md](docs/resume-guide.md)。
 
 ## 这个项目在解决什么问题
 
@@ -53,14 +53,15 @@ LLM 负责的节点：`parse_input`、`ask_clarification`、`generate_response` 
 | 测试 | pytest | 覆盖确定性业务逻辑 |
 | 数据源 | 本地 mock 数据（`data/mock_flights.json`） | 当前阶段不接入真实机票 API |
 
-## 快速开始（设计目标，将随开发进度验证为真实命令）
+## 快速开始
 
 ```bash
 git clone <repo-url>
 cd flight-price-compare
 
-# 安装依赖
-uv sync   # 或 pip install -r requirements.txt
+# 安装依赖（任选其一）
+pip install -r requirements.txt
+# 或者用 conda/venv 创建好环境后再 pip install -r requirements.txt
 
 # 配置环境变量
 cp .env.example .env
@@ -81,16 +82,17 @@ curl -X POST http://127.0.0.1:8000/query \
   -d '{"message": "帮我看看9月从上海去东京，玩5天，带一个20kg托运行李，不要红眼航班"}'
 ```
 
-示例响应结构（字段示意，非真实返回）：
+响应结构示例（字段结构真实，具体数值取决于你配置的模型和请求参数；`status` 会是 `results`/`clarification`/`error` 三者之一）：
 
 ```json
 {
-  "status": "ok",
+  "status": "results",
+  "message": "已为你找到 3 档结果，均来自 mock 数据源...",
   "missing_fields": [],
   "results": {
-    "cheapest": { "total_price_cny": 0, "source": "mock", "queried_at": "" },
-    "best_overall": { "total_price_cny": 0, "source": "mock", "queried_at": "" },
-    "most_comfortable": { "total_price_cny": 0, "source": "mock", "queried_at": "" }
+    "cheapest": { "tier": "cheapest", "flight_id": "NH920", "total_price_cny": 1800.0, "source": "mock_b", "queried_at": "2026-09-14T08:00:00+00:00" },
+    "best_overall": { "tier": "best_overall", "flight_id": "NH920", "total_price_cny": 1800.0, "source": "mock_b", "queried_at": "2026-09-14T08:00:00+00:00" },
+    "most_comfortable": { "tier": "most_comfortable", "flight_id": "NH920", "total_price_cny": 1800.0, "source": "mock_b", "queried_at": "2026-09-14T08:00:00+00:00" }
   }
 }
 ```
@@ -100,6 +102,18 @@ curl -X POST http://127.0.0.1:8000/query \
 ```bash
 python -m src.mcp_server
 ```
+
+## 运行测试与评测
+
+```bash
+# 确定性逻辑的单元测试（不需要 LLM Key，22 个用例全部通过）
+pytest -q
+
+# 端到端评测集（需要先配置好 .env 里的真实 LLM_API_KEY）
+python -m eval.run_eval
+```
+
+`pytest` 覆盖价格计算、币种换算、去重、验价、红眼过滤等确定性逻辑，随时可以在没有网络/API Key 的情况下运行。`eval/run_eval.py` 会跑 10 个固定场景并把参数提取正确率、工具调用成功率、端到端任务完成率、平均响应时间与平均 Token 成本写入 `eval/results.md`——这一步需要真实的 LLM 调用，数字必须由你自己跑出来。
 
 ## 项目结构
 

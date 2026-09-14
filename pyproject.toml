@@ -1,0 +1,24 @@
+[project]
+name = "flight-price-compare"
+version = "0.1.0"
+description = "机票比价 Agent：LangGraph 编排 + FastAPI 服务 + 最小 MCP Server"
+requires-python = ">=3.11"
+dependencies = [
+    "langgraph>=0.2.0",
+    "openai>=1.40.0",
+    "pydantic>=2.7.0",
+    "fastapi>=0.111.0",
+    "uvicorn>=0.30.0",
+    "python-dotenv>=1.0.0",
+    "mcp>=2.0.0",
+]
+
+[project.optional-dependencies]
+dev = ["pytest>=8.0.0"]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
